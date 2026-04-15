@@ -31,14 +31,8 @@ module.exports = {
         "packages/game-engine/**/*.ts",
       ],
       rules: {
-        "no-restricted-globals": [
-          "error",
-          {
-            name: "Math",
-            message:
-              "Math.random() is banned in game logic (AC-003). Use the deterministic seed system.",
-          },
-        ],
+        // Ban only Math.random() — Math.floor/min/max/imul etc. are allowed.
+        // no-restricted-globals would ban the whole Math object, which is wrong.
         "no-restricted-properties": [
           "error",
           {

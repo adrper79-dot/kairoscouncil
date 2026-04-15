@@ -35,7 +35,6 @@ import {
   CHRONOS_OVERDELAY_PENALTY,
   TRANSIT_POWER_FLOOR,
 } from '@kairos/shared';
-import type { SeededRandom } from '../seed/seed.js';
 
 /** Bond TP bonuses indexed by aspect type. */
 const BOND_TP_BONUS: Record<AspectType, [number, number]> = {

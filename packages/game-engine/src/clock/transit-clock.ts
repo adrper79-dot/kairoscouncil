@@ -18,7 +18,7 @@
  * @see GAME_DESIGN.md §7.9 Win Conditions
  */
 
-import type { MatchState, CardInstance } from '@kairos/shared';
+import type { MatchState } from '@kairos/shared';
 import { KairosError, ErrorCode, TRANSIT_CLOCK_WIN, DESPERATION_THRESHOLD, CELESTIAL_INVERSION_THRESHOLD } from '@kairos/shared';
 
 /** Win condition result. */
@@ -171,7 +171,7 @@ export function checkWinConditions(
   match: MatchState,
   goingSecondPlayerId: string,
 ): WinConditionResult {
-  const clockEntries = Object.entries(match.transitClocks) as [string, number][];
+  const clockEntries = Object.entries(match.transitClocks);
   const winners = clockEntries.filter(([, clock]) => clock >= TRANSIT_CLOCK_WIN);
 
   if (winners.length === 0) {

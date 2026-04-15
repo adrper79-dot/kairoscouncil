@@ -201,10 +201,15 @@ export function processPassPhase(match: MatchState): MatchState {
       ...player,
       carryoverCE: Math.min(player.celestialEnergy, MAX_CE_CARRYOVER),
       celestialEnergy: 0,
-      // Reset dormant action flags for next turn
+      // Reset dormant action flags and decrement Phoenix Reborn immunity counter
       battlefield: player.battlefield.map((card) => ({
         ...card,
         dormantActionUsed: false,
+        // Decrement Phoenix Reborn immunity counter (GAME_DESIGN.md §7.7)
+        // 0 = no immunity; > 0 = immune to Eros/Aether for this many more turns
+        phoenixRebornTurns: card.phoenixRebornTurns > 0
+          ? card.phoenixRebornTurns - 1
+          : 0,
       })),
     };
   });
