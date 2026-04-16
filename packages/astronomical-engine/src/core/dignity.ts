@@ -6,7 +6,7 @@
  * AC-001: Core Layer — output is DignityState, consumed by Event Mapper.
  */
 
-import type { Planet, DignityState } from '@kairos/shared';
+import type { DignityState } from '@kairos/shared';
 import { normalize360 } from './math-utils.js';
 
 /**
@@ -108,7 +108,7 @@ const DIGNITY_TABLE: Record<
  * evaluateDignity('Sun', 195) // → 'fall' (Libra)
  * evaluateDignity('Sun', 270) // → 'peregrine' (Capricorn)
  */
-export function evaluateDignity(planet: Planet | string, longitude: number): DignityState {
+export function evaluateDignity(planet: string, longitude: number): DignityState {
   const table = DIGNITY_TABLE[planet];
   if (!table) return 'peregrine';
 

@@ -16,4 +16,4 @@ export * from './core/index.js';
 export * from './event-mapper/index.js';
 
 // Transit Cache management (Task 4)
-// export * from './cache/index.js';
+export * from './cache/index.js';

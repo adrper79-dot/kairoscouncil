@@ -4,7 +4,7 @@
  * These types consume astronomical output but never import engine internals (AC-001).
  */
 
-import type { AspectType, Planet, ZodiacSign } from './astronomical.js';
+import type { AspectType, Planet } from './astronomical.js';
 
 /** The five Forge schools — AC-006. */
 export type ForgeSchool = 'Chronos' | 'Eros' | 'Aether' | 'Lux' | 'Phoenix';

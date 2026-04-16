@@ -4,22 +4,18 @@
  * AC-002: All game state is authoritative server-side.
  */
 
+import { handleRequest } from './routes/index.js';
+import { addCorsHeaders } from './middleware/index.js';
+
+export { MatchDurableObject } from './durable-objects/index.js';
+
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-
-    // Health check
-    if (url.pathname === '/health') {
-      return new Response(JSON.stringify({ status: 'ok', version: '0.0.1' }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+  async fetch(request: Request, _env: Env, _ctx: ExecutionContext): Promise<Response> {
+    if (request.method === 'OPTIONS') {
+      return addCorsHeaders(new Response(null, { status: 204 }));
     }
-
-    // Routes to be implemented in Task 12
-    return new Response(JSON.stringify({ error: 'Not Found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await handleRequest(request, _env);
+    return addCorsHeaders(response);
   },
 };
 

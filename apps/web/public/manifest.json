@@ -1,0 +1,10 @@
+{
+  "name": "Kairos' Council",
+  "short_name": "Kairos",
+  "description": "A Living Card Game of Cosmic Power",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0a1e",
+  "theme_color": "#0f0a1e",
+  "icons": []
+}

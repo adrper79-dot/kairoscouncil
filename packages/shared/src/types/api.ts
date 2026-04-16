@@ -3,7 +3,7 @@
  * Types for the API layer — requests, responses, auth.
  */
 
-import type { MatchMode, ForgeSchool, Archetype } from './game.js';
+import type { MatchMode, Archetype } from './game.js';
 
 /** JWT payload structure. */
 export interface JWTPayload {

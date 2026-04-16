@@ -9,12 +9,13 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "migrate": "tsx src/migrate.ts",
     "seed": "tsx src/seed.ts",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@kairos/shared": "workspace:*"
+    "@kairos/shared": "workspace:*",
+    "@neondatabase/serverless": "^0.9.0"
   }
 }

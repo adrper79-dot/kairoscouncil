@@ -77,7 +77,7 @@ export function jdeToDate(jde: number): {
   const F = jd - Z;
 
   let A: number;
-  const isGregorian = Z >= 2299161;
+  const isGregorian = Z >= GREGORIAN_REFORM_JDE + 0.5;
 
   if (isGregorian) {
     const alpha = Math.floor((Z - 1867216.25) / 36524.25);
