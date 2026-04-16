@@ -46,5 +46,3 @@ export { evaluateDignity } from './dignity.js';
 export { computeNatalChart, computeNatalChartFromBirthData } from './natal-chart.js';
 export type { NatalChartInput } from './natal-chart.js';
 export { computeCosmosState, computeCosmosStateFromDate } from './cosmos-state.js';
-// Dignity evaluation — to be implemented in Task 2
-// Eclipse/station detection — to be implemented in Task 2

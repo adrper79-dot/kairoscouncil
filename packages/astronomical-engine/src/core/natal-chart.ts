@@ -5,7 +5,7 @@
  * AC-001: Core Layer — no game concepts.
  */
 
-import type { NatalChart, BirthData, PlanetaryPosition } from '@kairos/shared';
+import type { NatalChart, BirthData } from '@kairos/shared';
 import { calculatePlanetaryPositions } from './planetary-positions.js';
 import { detectAspects } from './aspects.js';
 

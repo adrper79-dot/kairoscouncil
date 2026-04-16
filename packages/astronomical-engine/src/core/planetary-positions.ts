@@ -23,11 +23,6 @@ import {
 } from './math-utils.js';
 import { ORBITAL_ELEMENTS } from './constants.js';
 
-const ZODIAC_SIGNS: ZodiacSign[] = [
-  'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
-  'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
-];
-
 /**
  * Computes heliocentric rectangular ecliptic coordinates (x, y, z in AU)
  * for a planet given its Keplerian orbital elements at time T.

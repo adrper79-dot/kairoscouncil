@@ -19,5 +19,9 @@
     "@kairos/astronomical-engine": "workspace:*",
     "@kairos/game-engine": "workspace:*",
     "@kairos/database": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250409.0",
+    "wrangler": "^3.0.0"
   }
 }
