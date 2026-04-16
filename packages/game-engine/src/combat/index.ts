@@ -87,11 +87,10 @@ export function getForgeMatchup(
 export function resolveAttack(
   attacker: CardInstance,
   target: CardInstance,
-  cosmosSnapshot: CosmosSnapshot,
+  _cosmosSnapshot: CosmosSnapshot,
   rng: SeededRandom,
 ): AttackResult {
   // Reserved: cosmosSnapshot supports future event-based damage modifiers (AC-004 roadmap)
-  void cosmosSnapshot;
 
   // Clamp transit power to valid range per AC-004
   const transitPower = Math.min(

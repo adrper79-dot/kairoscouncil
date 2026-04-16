@@ -3,7 +3,7 @@
  * Simple auth state store (token + player ID).
  * AC-002: Only the server validates JWTs. This is display state only.
  */
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 
 interface AuthState {
   token: string | null;
@@ -44,17 +44,15 @@ export function clearAuth(): void {
   notify();
 }
 
-/** React hook to subscribe to auth state. */
+/** React hook to subscribe to auth state. Properly cleans up on unmount. */
 export function useAuthStore(): AuthState {
   const [, rerender] = useState(0);
-  const subscribe = useCallback(() => {
+
+  useEffect(() => {
     const fn = (): void => { rerender((n) => n + 1); };
     _listeners.add(fn);
     return (): void => { _listeners.delete(fn); };
   }, []);
 
-  // Subscribe on mount
-  const unsubRef = { current: subscribe() };
-  void unsubRef; // We rely on GC — fine for Phase 0
   return _state;
 }
