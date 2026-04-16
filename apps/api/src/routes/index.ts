@@ -3,7 +3,6 @@
  * API route handlers — all game state computed server-side (AC-002).
  */
 
-import { neon } from '@neondatabase/serverless';
 import {
   createDb,
   getPlayerByEmail,
@@ -16,9 +15,9 @@ import {
   createMatch,
   getMatchById,
 } from '@kairos/database';
-import { computeCosmosStateFromDate } from '@kairos/astronomical-engine';
+import { computeCosmosStateFromDate, detectNamedEvents } from '@kairos/astronomical-engine';
 import { initializeMatch, drawOpeningHand } from '@kairos/game-engine';
-import type { MatchMode } from '@kairos/shared';
+import type { MatchMode, CosmosSnapshot } from '@kairos/shared';
 import { RATE_LIMITS } from '@kairos/shared';
 import type { Env } from '../index.js';
 import {
@@ -29,7 +28,16 @@ import {
   checkRateLimit,
 } from '../middleware/index.js';
 
-type SqlClient = ReturnType<typeof neon>;
+/** Safely parse a JSON request body into a plain object. */
+async function parseJsonBody(request: Request): Promise<Record<string, unknown>> {
+  // request.json() returns `any` from CF workers types; we validate shape here.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const raw = await request.json();
+  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  return {};
+}
 
 /** Route a request to the appropriate handler. */
 export async function handleRequest(request: Request, env: Env): Promise<Response> {
@@ -37,9 +45,12 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   const path = url.pathname;
   const method = request.method;
 
-  // Apply global rate limit using client IP
   const clientIp = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-  const limit = await checkRateLimit(env.TRANSIT_CACHE, `api:${clientIp}`, RATE_LIMITS['api'] ?? { requests: 300, window: '1m' });
+  const limit = await checkRateLimit(
+    env.TRANSIT_CACHE,
+    `api:${clientIp}`,
+    RATE_LIMITS['api'] ?? { requests: 300, window: '1m' },
+  );
   if (!limit.allowed) return errorResponse('RATE_LIMITED', 'Too many requests', 429, true);
 
   try {
@@ -61,20 +72,27 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   }
 }
 
+/** GET /health */
 function handleHealth(): Response {
   return jsonResponse({ status: 'ok', version: '0.0.1' });
 }
 
+/** GET /cosmos — current astronomical state (public, no auth) */
 function handleCosmos(): Response {
   const state = computeCosmosStateFromDate(new Date());
   return jsonResponse(state);
 }
 
+/** POST /auth/register */
 async function handleRegister(request: Request, env: Env): Promise<Response> {
-  const rl = await checkRateLimit(env.TRANSIT_CACHE, `auth:${request.headers.get('CF-Connecting-IP') ?? 'x'}`, RATE_LIMITS['auth'] ?? { requests: 10, window: '1m' });
+  const rl = await checkRateLimit(
+    env.TRANSIT_CACHE,
+    `auth:${request.headers.get('CF-Connecting-IP') ?? 'x'}`,
+    RATE_LIMITS['auth'] ?? { requests: 10, window: '1m' },
+  );
   if (!rl.allowed) return errorResponse('RATE_LIMITED', 'Too many auth attempts', 429, true);
 
-  const body = await request.json() as Record<string, unknown>;
+  const body = await parseJsonBody(request);
   const email = body['email'];
   const displayName = body['displayName'];
   if (typeof email !== 'string' || typeof displayName !== 'string') {
@@ -82,126 +100,145 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   }
 
   const sql = createDb(env.NEON_DATABASE_URL);
-  const existing = await getPlayerByEmail(sql as SqlClient, email);
+  const existing = await getPlayerByEmail(sql, email);
   if (existing) return errorResponse('CONFLICT', 'Email already registered', 409);
 
-  const player = await createPlayer(sql as SqlClient, email, displayName);
+  const player = await createPlayer(sql, email, displayName);
   const token = await signJWT({ sub: player.id, email: player.email }, env.JWT_SECRET);
   return jsonResponse({ player, token }, 201);
 }
 
+/** POST /auth/login */
 async function handleLogin(request: Request, env: Env): Promise<Response> {
-  const rl = await checkRateLimit(env.TRANSIT_CACHE, `auth:${request.headers.get('CF-Connecting-IP') ?? 'x'}`, RATE_LIMITS['auth'] ?? { requests: 10, window: '1m' });
+  const rl = await checkRateLimit(
+    env.TRANSIT_CACHE,
+    `auth:${request.headers.get('CF-Connecting-IP') ?? 'x'}`,
+    RATE_LIMITS['auth'] ?? { requests: 10, window: '1m' },
+  );
   if (!rl.allowed) return errorResponse('RATE_LIMITED', 'Too many auth attempts', 429, true);
 
-  const body = await request.json() as Record<string, unknown>;
+  const body = await parseJsonBody(request);
   const email = body['email'];
   if (typeof email !== 'string') return errorResponse('VALIDATION_ERROR', 'email required', 400);
 
   const sql = createDb(env.NEON_DATABASE_URL);
-  let player = await getPlayerByEmail(sql as SqlClient, email);
+  let player = await getPlayerByEmail(sql, email);
   if (!player) {
-    const displayName = typeof body['displayName'] === 'string' ? body['displayName'] : email.split('@')[0] ?? email;
-    player = await createPlayer(sql as SqlClient, email, displayName);
+    const rawDisplay = body['displayName'];
+    const displayName = typeof rawDisplay === 'string' ? rawDisplay : email.split('@')[0] ?? email;
+    player = await createPlayer(sql, email, displayName);
   }
   const token = await signJWT({ sub: player.id, email: player.email }, env.JWT_SECRET);
   return jsonResponse({ player, token });
 }
 
+/** GET /figures */
 async function handleListFigures(env: Env): Promise<Response> {
   const sql = createDb(env.NEON_DATABASE_URL);
-  const figures = await getAllFigures(sql as SqlClient);
+  const figures = await getAllFigures(sql);
   return jsonResponse(figures);
 }
 
+/** GET /figures/:id */
 async function handleGetFigure(path: string, env: Env): Promise<Response> {
   const id = path.split('/')[2];
   if (!id) return errorResponse('NOT_FOUND', 'Figure not found', 404);
   const sql = createDb(env.NEON_DATABASE_URL);
-  const figure = await getFigureById(sql as SqlClient, id);
+  const figure = await getFigureById(sql, id);
   if (!figure) return errorResponse('NOT_FOUND', 'Figure not found', 404);
   return jsonResponse(figure);
 }
 
+/** GET /decks — authenticated player's decks */
 async function handleListDecks(request: Request, env: Env): Promise<Response> {
   const jwt = await authenticateRequest(request, env.JWT_SECRET);
   const sql = createDb(env.NEON_DATABASE_URL);
-  const decks = await getDecksByOwner(sql as SqlClient, jwt.sub);
+  const decks = await getDecksByOwner(sql, jwt.sub);
   return jsonResponse(decks);
 }
 
+/** POST /decks */
 async function handleCreateDeck(request: Request, env: Env): Promise<Response> {
   const jwt = await authenticateRequest(request, env.JWT_SECRET);
-  const body = await request.json() as Record<string, unknown>;
+  const body = await parseJsonBody(request);
   const name = body['name'];
   const archetypeSchool = body['archetypeSchool'];
-  const cardIds = body['cardIds'];
+  const rawCardIds = body['cardIds'];
   const councilLeaderId = body['councilLeaderId'];
   if (
     typeof name !== 'string' ||
     typeof archetypeSchool !== 'string' ||
-    !Array.isArray(cardIds) ||
+    !Array.isArray(rawCardIds) ||
     typeof councilLeaderId !== 'string'
   ) {
     return errorResponse('VALIDATION_ERROR', 'name, archetypeSchool, cardIds, councilLeaderId required', 400);
   }
+  const cardIds = rawCardIds.filter((c): c is string => typeof c === 'string');
   const sql = createDb(env.NEON_DATABASE_URL);
-  const deck = await createDeck(sql as SqlClient, jwt.sub, name, archetypeSchool, cardIds as string[], councilLeaderId);
+  const deck = await createDeck(sql, jwt.sub, name, archetypeSchool, cardIds, councilLeaderId);
   return jsonResponse(deck, 201);
 }
 
+/** GET /decks/:id */
 async function handleGetDeck(path: string, request: Request, env: Env): Promise<Response> {
   const jwt = await authenticateRequest(request, env.JWT_SECRET);
   const id = path.split('/')[2];
   if (!id) return errorResponse('NOT_FOUND', 'Deck not found', 404);
   const sql = createDb(env.NEON_DATABASE_URL);
-  const deck = await getDeckById(sql as SqlClient, id);
+  const deck = await getDeckById(sql, id);
   if (!deck) return errorResponse('NOT_FOUND', 'Deck not found', 404);
   if (deck.ownerId !== jwt.sub) return errorResponse('FORBIDDEN', 'Not your deck', 403);
   return jsonResponse(deck);
 }
 
+/** POST /matches */
 async function handleCreateMatch(request: Request, env: Env): Promise<Response> {
   const jwt = await authenticateRequest(request, env.JWT_SECRET);
-  const body = await request.json() as Record<string, unknown>;
+  const body = await parseJsonBody(request);
   const deckId = body['deckId'];
-  const mode = (body['mode'] ?? 'transit') as MatchMode;
+  const rawMode = body['mode'];
+  const mode: MatchMode = typeof rawMode === 'string' ? (rawMode as MatchMode) : 'transit';
   if (typeof deckId !== 'string') return errorResponse('VALIDATION_ERROR', 'deckId required', 400);
 
   const sql = createDb(env.NEON_DATABASE_URL);
-  const deck = await getDeckById(sql as SqlClient, deckId);
+  const deck = await getDeckById(sql, deckId);
   if (!deck) return errorResponse('NOT_FOUND', 'Deck not found', 404);
   if (deck.ownerId !== jwt.sub) return errorResponse('FORBIDDEN', 'Not your deck', 403);
 
-  const cosmosSnapshot = computeCosmosStateFromDate(new Date());
+  const cosmosState = computeCosmosStateFromDate(new Date());
+  const activeEvents = detectNamedEvents(cosmosState.planetaryPositions, {
+    eclipseActive: cosmosState.eclipseActive,
+  });
+  const cosmosSnap: CosmosSnapshot = {
+    timestamp: new Date(cosmosState.timestamp),
+    activeEvents,
+    forecast: [],
+  };
+
   let state = initializeMatch({
     player1Id: jwt.sub,
     player2Id: jwt.sub,
     deck1: deck,
     deck2: deck,
     mode,
-    cosmosSnapshot: {
-      timestamp: new Date(cosmosSnapshot.timestamp),
-      activeEvents: cosmosSnapshot.activeEvents,
-      forecast: cosmosSnapshot.forecast,
-    },
+    cosmosSnapshot: cosmosSnap,
     timestamp: new Date(),
   });
   state = drawOpeningHand(state);
 
-  const matchId = await createMatch(sql as SqlClient, state);
+  const matchId = await createMatch(sql, state);
   return jsonResponse({ matchId, state }, 201);
 }
 
+/** GET /matches/:id */
 async function handleGetMatch(path: string, request: Request, env: Env): Promise<Response> {
   const jwt = await authenticateRequest(request, env.JWT_SECRET);
   const id = path.split('/')[2];
   if (!id) return errorResponse('NOT_FOUND', 'Match not found', 404);
   const sql = createDb(env.NEON_DATABASE_URL);
-  const state = await getMatchById(sql as SqlClient, id);
+  const state = await getMatchById(sql, id);
   if (!state) return errorResponse('NOT_FOUND', 'Match not found', 404);
-  const isParticipant = state.players.some(p => p.playerId === jwt.sub);
+  const isParticipant = state.players.some((p) => p.playerId === jwt.sub);
   if (!isParticipant) return errorResponse('FORBIDDEN', 'Not a match participant', 403);
   return jsonResponse(state);
 }
-

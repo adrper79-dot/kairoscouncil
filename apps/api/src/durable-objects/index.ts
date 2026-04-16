@@ -16,6 +16,7 @@ export class MatchDurableObject implements DurableObject {
   ) {}
 
   /** Handle incoming requests: upgrades GET /ws to WebSocket, rejects others. */
+  // eslint-disable-next-line @typescript-eslint/require-await
   async fetch(request: Request): Promise<Response> {
     const upgrade = request.headers.get('Upgrade');
     if (upgrade !== 'websocket') {
